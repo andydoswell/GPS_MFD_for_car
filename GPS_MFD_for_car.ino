@@ -1,7 +1,6 @@
 /*
   GPS Multifunction display and head up display
   (C) Andy Doswell 23rd July 2017
-  License: The MIT License (See full license at the bottom of this file)
 
   Schematic and decsription can be found at www.andydoz.blogspot.com/
 
@@ -13,19 +12,25 @@
   details.
 
 */
+#include <OneWire.h> // from http://playground.arduino.cc/Learning/OneWire
+#include <DallasTemperature.h> // from http://www.hacktronics.com/code/DallasTemperature.zip.
 #include <Wire.h>
 #include <LiquidCrystal_I2C.h>
 #include <TinyGPS++.h>
 LiquidCrystal_I2C  lcd(0x3f, 16, 2); // I2C address 0x3f
 TinyGPSPlus gps; //TinyGPS++ Serial
+#define ONE_WIRE_BUS 8 // Data wire from temp sensor is plugged into pin 8 on the Arduino
+OneWire oneWire(ONE_WIRE_BUS); // Setup a oneWire instance to communicate with any OneWire devices
+DallasTemperature sensors(&oneWire); // Pass our oneWire reference to Dallas Temperature.
 static   uint32_t GPSBaud = 57600; // GPS baudrate.
 int hourTen; //tens of hours
 int hourUnit; //units of hours
 int minTen; // you get the idea..
 int minUnit;
 float MPH;
-int loopCounter;
 unsigned int hours; // whole hours displayed
+float tempC; // Temperature in degrees C
+float voltage;
 
 byte antenna[8] = { // bitmap for antenna symbol
   0b00000,
@@ -149,17 +154,21 @@ byte fiveBarsNoLock[8] = {
 void setup() {
   lcd.init();
   lcd.begin(16, 2); // set up the LCD as 20 x 4 display
-  //  lcd.setBacklightPin(3, POSITIVE);
   lcd.setBacklight(HIGH);
   lcd.clear();
-  lcd.print("Waiting for GPS");
-  delay (10000); // wait for other Arduino and GPS receiver to come up and configure GPS in runtime
-  Serial.begin(GPSBaud); // start the comms with the GPS Rx
+  lcd.print("Starting up");
+  for ( int i = 0; i <= 15; i++) { // delay for 16 seconds whilst the other arduino comes up and configures the GPS receiver in runtime.
+    lcd.setCursor (i, 1);
+    lcd.print (".");  // give the user something to look at
+    delay (1000);
+  }
+  Serial.begin(57600); // start the comms with the GPS Rx
   lcd.clear();
   lcd.createChar (1, antenna);
   lcd.setCursor(0, 0);
   lcd.write((uint8_t)1); // write antenna symbol
   lcd.createChar (0, oneBarNoLock);
+  sensors.begin(); // start up the Dallas temperature sensors
 
 }
 
@@ -217,6 +226,10 @@ boolean isBST() // this bit of code blatantly plagarised from http://my-small-pr
 
 void displayData() {
 
+  updateSignal();
+  getVoltage();
+  sensors.requestTemperatures(); // Request temperature
+  tempC = sensors.getTempCByIndex(0); // set the temperature in degrees C from the first sensor in line, rather than by address.
   hours = (gps.time.hour());
   if (isBST()) {
     hours++;
@@ -244,19 +257,25 @@ void displayData() {
   lcd.print(MPH, 1);
   lcd.print(" MPH ");
   lcd.print(TinyGPSPlus::cardinal(gps.course.value()));
-  lcd.print (" ");
+  lcd.print ("  ");
   lcd.setCursor(0, 1);
-  lcd.print(gps.date.day());
-  lcd.print("/");
-  lcd.print(gps.date.month());
-  lcd.print("/");
-  lcd.print(gps.date.year());
-  lcd.print("  ");
   lcd.print(hourTen);
   lcd.print(hourUnit);
   lcd.print(":");
   lcd.print(minTen);
   lcd.print (minUnit);
+  lcd.print (" ");
+  if (tempC == -127) {
+    lcd.print("ER");
+  }
+  else {
+    lcd.print(tempC, 1);
+    lcd.print((char)0xDF);
+    lcd.print("");
+
+  }
+  lcd.print(voltage, 1);
+  lcd.print("v ");
 
 }
 
@@ -271,7 +290,7 @@ static void smartDelay(unsigned long ms)
 }
 
 void updateSignal() {
-  if (gps.location.isUpdated() && (gps.location.age() < 1000)) {
+  if (gps.location.isValid() ) {
     if (gps.satellites.value() > 8) {
       lcd.createChar(0, fiveBarsLocked);
     }
@@ -290,65 +309,33 @@ void updateSignal() {
     }
   }
   else {
-    if (gps.location.age() > 1000) {
-      if (gps.satellites.value() > 8) {
-        lcd.createChar(0, fiveBarsNoLock);
-      }
-      if (gps.satellites.value() < 8) {
-        lcd.createChar(0, fourBarsNoLock);
-      }
-      if (gps.satellites.value() < 6) {
-        lcd.createChar(0, threeBarsNoLock);
-      }
-      if (gps.satellites.value() < 5) {
-        lcd.createChar(0, twoBarsNoLock);
-      }
+    if (gps.satellites.value() > 8) {
+      lcd.createChar(0, fiveBarsNoLock);
+    }
+    if (gps.satellites.value() < 8) {
+      lcd.createChar(0, fourBarsNoLock);
+    }
+    if (gps.satellites.value() < 6) {
+      lcd.createChar(0, threeBarsNoLock);
+    }
+    if (gps.satellites.value() < 5) {
+      lcd.createChar(0, twoBarsNoLock);
+    }
 
-      if (gps.satellites.value() < 4) {
-        lcd.createChar(0, oneBarNoLock);
-      }
+    if (gps.satellites.value() < 4) {
+      lcd.createChar(0, oneBarNoLock);
     }
   }
 }
 
+void getVoltage () {
+  int sensorValueDC = analogRead (A0);
+  voltage =  ((sensorValueDC * (5.0 / 1023.0)) * 3);
+}
 
 void loop()
 {
-
-  loopCounter ++;
-  while (Serial.available() > 0) //While GPS message received
-    if (gps.encode(Serial.read()))
-
-      if (loopCounter >= 100) {
-        updateSignal();
-        loopCounter = 0;
-      }
+  smartDelay(250);
   displayData();
 
 }
-
-
-
-/*
-   Copyright (c) 2017 Andrew Doswell
-
-   Permission is hereby granted, free of charge, to any person obtaining a copy
-   of this software and associated documentation files (the "Software"), to deal
-   in the Software without restriction, including without limitation the rights
-   to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
-   copies of the Software, and to permit persons to whom the Software is
-   furnished to do so, subject to the following conditions:
-
-   The above copyright notice and this permiSerialion notice shall be included in
-   all copies or substantial portions of the Software.
-
-   Any commercial use is prohibited without prior arrangement.
-
-   THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
-   IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
-   FITNESerial FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
-   AUTHOR(S) OR COPYRIGHT HOLDER(S) BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
-   LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
-   OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN
-   THE SOFTWARE.
-*/

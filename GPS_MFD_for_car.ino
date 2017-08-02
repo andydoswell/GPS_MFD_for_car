@@ -27,7 +27,7 @@ int hourTen; //tens of hours
 int hourUnit; //units of hours
 int minTen; // you get the idea..
 int minUnit;
-float MPH;
+int MPH;
 unsigned int hours; // whole hours displayed
 float tempC; // Temperature in degrees C
 float voltage;
@@ -254,7 +254,7 @@ void displayData() {
     MPH = 0;
   }
   lcd.setCursor(3, 0);
-  lcd.print(MPH, 1);
+  lcd.print(MPH);
   lcd.print(" MPH ");
   lcd.print(TinyGPSPlus::cardinal(gps.course.value()));
   lcd.print ("  ");

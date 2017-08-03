@@ -255,9 +255,16 @@ void displayData() {
   }
   lcd.setCursor(3, 0);
   lcd.print(MPH);
-  lcd.print(" MPH ");
-  lcd.print(TinyGPSPlus::cardinal(gps.course.value()));
-  lcd.print ("  ");
+  lcd.print(" mph ");
+  lcd.setCursor(10, 0);
+  if (tempC == -127) {
+    lcd.print("TEMPOC"); // temp open circuit
+  }
+  else {
+    lcd.print(tempC, 1);
+    lcd.print((char)0xDF);
+    lcd.print("C ");
+  }
   lcd.setCursor(0, 1);
   lcd.print(hourTen);
   lcd.print(hourUnit);
@@ -265,15 +272,7 @@ void displayData() {
   lcd.print(minTen);
   lcd.print (minUnit);
   lcd.print (" ");
-  if (tempC == -127) {
-    lcd.print("ER");
-  }
-  else {
-    lcd.print(tempC, 1);
-    lcd.print((char)0xDF);
-    lcd.print("");
-
-  }
+  lcd.setCursor(10,1);
   lcd.print(voltage, 1);
   lcd.print("v ");
 

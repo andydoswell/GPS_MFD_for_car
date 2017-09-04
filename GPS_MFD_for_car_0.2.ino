@@ -156,12 +156,6 @@ void setup() {
   lcd.begin(16, 2); // set up the LCD as 20 x 4 display
   lcd.setBacklight(HIGH);
   lcd.clear();
-  lcd.print("Starting up");
-  for ( int i = 0; i <= 15; i++) { // delay for 16 seconds whilst the other arduino comes up and configures the GPS receiver in runtime.
-    lcd.setCursor (i, 1);
-    lcd.print (".");  // give the user something to look at
-    delay (1000);
-  }
   Serial.begin(57600); // start the comms with the GPS Rx
   lcd.clear();
   lcd.createChar (1, antenna);
